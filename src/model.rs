@@ -2,6 +2,7 @@
 ///
 /// TPK elements are the building block of Tiwind Packages: they contain a single piece of data or
 /// metadata but, when put together, can describe complex and structured data.
+#[derive(Debug)]
 pub enum Element {
     /// Represents a TPK marker.
     Marker(String),

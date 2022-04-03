@@ -1,4 +1,6 @@
 mod model;
-mod write;
+pub mod read;
+pub mod write;
 
 pub use model::Element;
+pub use read::TpkReader;
