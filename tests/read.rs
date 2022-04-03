@@ -81,13 +81,13 @@ fn test_read_invalid_folder_collection_sub_type() {
 #[test]
 fn test_read_false_boolean() {
     let input = vec![0b00110000u8];
-    read_element!(input reads to Element::Boolean(value) => assert_eq!(value, false));
+    read_element!(input reads to Element::Boolean(value) => assert!(!value));
 }
 
 #[test]
 fn test_read_true_boolean() {
     let input = vec![0b00110001u8];
-    read_element!(input reads to Element::Boolean(value) => assert_eq!(value, true));
+    read_element!(input reads to Element::Boolean(value) => assert!(value));
 }
 
 #[test]

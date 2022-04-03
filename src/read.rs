@@ -82,8 +82,7 @@ where
             shift += 7;
         }
 
-        self.read_utf8_string(size)
-            .map(|string| Element::Marker(string))
+        self.read_utf8_string(size).map(Element::Marker)
     }
 
     fn read_folder(&mut self, type_byte: u8) -> Result<Element> {
@@ -143,10 +142,8 @@ where
         let size = self.read_bundled_size(type_byte)?;
 
         match sub_type_byte {
-            0b0000 => self
-                .read_utf8_string(size)
-                .map(|string| Element::String(string)),
-            0b0100 => self.expect_heap(size).map(|bytes| Element::Blob(bytes)),
+            0b0000 => self.read_utf8_string(size).map(Element::String),
+            0b0100 => self.expect_heap(size).map(Element::Blob),
             _ => Err(UnknownType(previous_bytes_read, type_byte)),
         }
     }

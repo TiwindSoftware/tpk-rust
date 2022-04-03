@@ -87,15 +87,12 @@ fn dyn_size(size: usize) -> Vec<u8> {
     let mut size = size;
     while size > 0 {
         ret.push((size as u8 & 0x7F) | if size > 0x7F { 0b10000000u8 } else { 0u8 });
-        size = size >> 7;
+        size >>= 7;
     }
-    return ret;
+    ret
 }
 
 #[inline(always)]
 fn write(writer: &mut dyn io::Write, bytes: &[u8]) -> Result<()> {
-    writer
-        .write(bytes)
-        .map(|_| ())
-        .map_err(|io_error| Error::IO(io_error))
+    writer.write(bytes).map(|_| ()).map_err(Error::IO)
 }

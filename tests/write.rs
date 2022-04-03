@@ -133,6 +133,7 @@ fn test_write_float32() {
 }
 
 #[test]
+#[allow(clippy::excessive_precision)]
 fn test_write_float64() {
     let output = assert_element_write(Element::Float64(-45743210879.52954864501953125), 9);
     assert_eq!(output[0], 0b00101111u8);
