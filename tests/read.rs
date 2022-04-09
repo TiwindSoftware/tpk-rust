@@ -193,6 +193,7 @@ fn test_read_string_blob_with_invalid_type_byte() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_extension_not_supported() {
     let input = vec![0b01110000u8, 0b00000000u8];
     read_element!(input fails with Error::UnsupportedType(pos, msg) => {

@@ -1,64 +1,104 @@
-use std::{io, mem};
-
 use crate::Element;
+use std::{io, mem};
+use thiserror::Error;
 
 /// Representation of a TPK write error.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    /// A I/O error happened.
-    IO(std::io::Error),
     /// An unknown error happened.
     ///
     /// This error is "technical unknown", it should only be used in cases where the user is not
     /// supposed to get an error but gets one anyway. More simply put, this error being returned
     /// anywhere should be considered a bug or a feature that is not yet implemented.
+    #[error("Unknown error")]
     Unknown,
+
+    /// A I/O error happened.
+    #[error("I/O error while writing TPK data: {source}")]
+    Io {
+        #[from]
+        source: io::Error,
+    },
 }
 
 /// Representation of a TPK write result.
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl Element {
-    /// Write the element to a given [writer][io::Write].
+/// A TPK writer structure.
+///
+/// This structure holds the destination to which TPK data should be written.
+pub struct TpkWriter<T> {
+    write: T,
+}
+
+impl<T> TpkWriter<T>
+where
+    T: io::Write,
+{
+    /// Create a new [TPK writer][TpkWriter].
+    pub fn new(write: T) -> TpkWriter<T> {
+        TpkWriter { write }
+    }
+
+    /// Write the given [Element] to this writer.
     ///
     /// This function will write the binary representation of the TPK element, including the type
     /// byte, size bytes and data bytes (if any).
-    pub fn write(&self, writer: &mut dyn io::Write) -> Result<()> {
-        write(writer, &[self.get_type_byte()])?;
+    pub fn write_element(&mut self, element: &Element) -> Result<()> {
+        self.write.write(&[element.get_type_byte()])?;
 
-        match *self {
+        match *element {
             Element::Marker(ref val) => {
                 let size = val.len();
                 if size > 63 {
                     let remaining_size = size >> 6;
                     let dynsize = dyn_size(remaining_size);
-                    write(writer, dynsize.as_slice())?;
+                    self.write.write(dynsize.as_slice())?;
                 }
-                write(writer, val.as_bytes())
+                self.write.write(val.as_bytes())?;
             }
-            Element::Folder => Ok(()),
-            Element::Collection => Ok(()),
-            Element::Integer8(val) => write(writer, &[val as u8]),
-            Element::Integer16(val) => write(writer, &val.to_le_bytes()),
-            Element::Integer32(val) => write(writer, &val.to_le_bytes()),
-            Element::Integer64(val) => write(writer, &val.to_le_bytes()),
-            Element::UInteger8(val) => write(writer, &[val]),
-            Element::UInteger16(val) => write(writer, &val.to_le_bytes()),
-            Element::UInteger32(val) => write(writer, &val.to_le_bytes()),
-            Element::UInteger64(val) => write(writer, &val.to_le_bytes()),
-            Element::Float32(val) => write(writer, &val.to_le_bytes()),
-            Element::Float64(val) => write(writer, &val.to_le_bytes()),
-            Element::Boolean(_) => Ok(()),
+            Element::Integer8(val) => {
+                self.write.write(&[val as u8])?;
+            }
+            Element::Integer16(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::Integer32(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::Integer64(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::UInteger8(val) => {
+                self.write.write(&[val])?;
+            }
+            Element::UInteger16(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::UInteger32(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::UInteger64(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::Float32(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
+            Element::Float64(val) => {
+                self.write.write(&val.to_le_bytes())?;
+            }
             Element::String(ref val) => {
                 let bytes = val.as_bytes();
-                write(writer, &static_size(bytes.len()))?;
-                write(writer, bytes)
+                self.write.write(&static_size(bytes.len()))?;
+                self.write.write(bytes)?;
             }
             Element::Blob(ref val) => {
-                write(writer, &static_size(val.len()))?;
-                write(writer, val.as_slice())
+                self.write.write(&static_size(val.len()))?;
+                self.write.write(val.as_slice())?;
             }
-        }
+            _ => (),
+        };
+        Ok(())
     }
 }
 
@@ -90,9 +130,4 @@ fn dyn_size(size: usize) -> Vec<u8> {
         size >>= 7;
     }
     ret
-}
-
-#[inline(always)]
-fn write(writer: &mut dyn io::Write, bytes: &[u8]) -> Result<()> {
-    writer.write(bytes).map(|_| ()).map_err(Error::IO)
 }

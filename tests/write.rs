@@ -1,10 +1,10 @@
 use std::iter::repeat;
-
-use tpk::Element;
+use tpk::{Element, TpkWriter};
 
 fn assert_element_write(element: Element, expected_size: usize) -> Vec<u8> {
     let mut output = vec![];
-    element.write(&mut output).unwrap();
+    let mut writer = TpkWriter::new(&mut output);
+    writer.write_element(&element).unwrap();
     assert_eq!(output.len(), expected_size);
     output
 }

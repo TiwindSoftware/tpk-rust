@@ -1,26 +1,45 @@
-use crate::read::Error::{Syntax, UnknownType, UnsupportedType};
+use crate::read::Error::{Syntax, UnknownType};
 use crate::Element;
 use byteorder::{ByteOrder, LE};
 use std::{io, string};
 use thiserror::Error;
 
+/// Representation of a TPK read error.
 #[derive(Error, Debug)]
 pub enum Error {
+    /// An unknown error happened.
+    ///
+    /// This error is "technical unknown", it should only be used in cases where the user is not
+    /// supposed to get an error but gets one anyway. For example, this error should *never* be
+    /// thrown for a problem with a TPK file. More simply put, this error being returned anywhere
+    /// should be considered a bug or a feature that is not yet implemented.
     #[error("Unknown error")]
     Unknown,
 
+    /// A I/O error happened.
     #[error("I/O error while reading TPK data: {source}")]
     Io {
         #[from]
         source: io::Error,
     },
 
+    /// A syntax error happened.
+    ///
+    /// This error happens when the TPK payload that is being read is corrupted or invalid.
     #[error("Syntax error at byte {0}: {1}")]
     Syntax(usize, &'static str),
 
+    /// A type is unknown.
+    ///
+    /// This error happens when the TPK payload that is being read is lexically valid, but an
+    /// unknown type byte has been encountered.
     #[error("Unknown element type at byte {0}: {1:#X}")]
     UnknownType(usize, u8),
 
+    /// A UTF-8 string is invalid.
+    ///
+    /// This error happens when the TPK payload that is being read contains an invalid UTF-8
+    /// character at a place where it should be expected.
     #[error("Invalid UTF-8 character at byte {pos}: {source}")]
     InvalidString {
         pos: usize,
@@ -29,12 +48,25 @@ pub enum Error {
         source: string::FromUtf8Error,
     },
 
+    /// A type is unsupported.
+    ///
+    /// This error happens when the TPK payload that is being read is both lexically and
+    /// semantically valid, but an unsupported type byte has been encountered.
+    ///
+    /// Note that the mere existence of this error makes this crate non-TPK-compliant, and as such
+    /// this error case should be expected to be removed in the near future.
+    #[deprecated]
     #[error("Unsupported element type at byte {0}: {1}")]
     UnsupportedType(usize, &'static str),
 }
 
+/// Representation of a TPK read result.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A TPK reader structure.
+///
+/// This structure holds the source from which TPK data should be read, as well as internal reader
+/// contextual data.
 pub struct TpkReader<T> {
     read: T,
     previous_bytes_read: usize,
@@ -47,6 +79,7 @@ impl<T> TpkReader<T>
 where
     T: io::Read,
 {
+    /// Create a new [TPK reader][TpkReader].
     pub fn new(read: T) -> TpkReader<T> {
         TpkReader {
             read,
@@ -55,18 +88,26 @@ where
         }
     }
 
+    /// Read an [element][Element] from this reader.
+    ///
+    /// This function will consume bytes from the source reader, and will attempt to parse them
+    /// and construct a new [element][Element].
     pub fn read_element(&mut self) -> Result<Element> {
         let type_byte = self.expect::<1>()?[0];
         if type_byte & 0b10000000 != 0 {
             return self.read_marker(type_byte);
         }
 
+        #[allow(deprecated)]
         match (type_byte & 0xF0) >> 4 {
             0b0000 => self.read_folder(type_byte),
             0b0010 => self.read_number(type_byte),
             0b0011 => self.read_boolean(type_byte),
             0b0001 => self.read_string_or_blob(type_byte),
-            0b0111 => Err(UnsupportedType(self.previous_bytes_read, "extension")),
+            0b0111 => Err(Error::UnsupportedType(
+                self.previous_bytes_read,
+                "extension",
+            )),
             _ => Err(UnknownType(self.previous_bytes_read, type_byte)),
         }
     }
