@@ -45,7 +45,7 @@ where
     /// This function will write the binary representation of the TPK element, including the type
     /// byte, size bytes and data bytes (if any).
     pub fn write_element(&mut self, element: &Element) -> Result<()> {
-        self.write.write(&[element.get_type_byte()])?;
+        self.write.write_all(&[element.get_type_byte()])?;
 
         match *element {
             Element::Marker(ref val) => {
@@ -53,48 +53,48 @@ where
                 if size > 63 {
                     let remaining_size = size >> 6;
                     let dynsize = dyn_size(remaining_size);
-                    self.write.write(dynsize.as_slice())?;
+                    self.write.write_all(dynsize.as_slice())?;
                 }
-                self.write.write(val.as_bytes())?;
+                self.write.write_all(val.as_bytes())?;
             }
             Element::Integer8(val) => {
-                self.write.write(&[val as u8])?;
+                self.write.write_all(&[val as u8])?;
             }
             Element::Integer16(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::Integer32(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::Integer64(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::UInteger8(val) => {
-                self.write.write(&[val])?;
+                self.write.write_all(&[val])?;
             }
             Element::UInteger16(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::UInteger32(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::UInteger64(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::Float32(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::Float64(val) => {
-                self.write.write(&val.to_le_bytes())?;
+                self.write.write_all(&val.to_le_bytes())?;
             }
             Element::String(ref val) => {
                 let bytes = val.as_bytes();
-                self.write.write(&static_size(bytes.len()))?;
-                self.write.write(bytes)?;
+                self.write.write_all(&static_size(bytes.len()))?;
+                self.write.write_all(bytes)?;
             }
             Element::Blob(ref val) => {
-                self.write.write(&static_size(val.len()))?;
-                self.write.write(val.as_slice())?;
+                self.write.write_all(&static_size(val.len()))?;
+                self.write.write_all(val.as_slice())?;
             }
             _ => (),
         };
