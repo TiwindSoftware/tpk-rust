@@ -1,9 +1,11 @@
-# TPK for Rust &emsp; [![Build]][Build Link] [![Coverage]][Coverage Link]
+# TPK for Rust &emsp; [![Build]][Build Link] [![Coverage]][Coverage Link] [![Crate]][Crate Link]
 
-[Build]: https://github.com/ltfourrier/tpk-rust/actions/workflows/main.yml/badge.svg
+[Build]: https://img.shields.io/github/workflow/status/ltfourrier/tpk-rust/Build/master
 [Build Link]: https://github.com/ltfourrier/tpk-rust/actions/workflows/main.yml
-[Coverage]: https://codecov.io/gh/ltfourrier/tpk-rust/branch/master/graph/badge.svg?token=KKL1XJS3NU
+[Coverage]: https://img.shields.io/codecov/c/github/ltfourrier/tpk-rust
 [Coverage Link]: https://codecov.io/gh/ltfourrier/tpk-rust
+[Crate]: https://img.shields.io/crates/v/tpk
+[Crate Link]: https://crates.io/crates/tpk
 
 **Rust implementation of the [TPK format](https://github.com/ltfourrier/tpk-spec).**
 
@@ -142,10 +144,10 @@ Since `tpk-rust` is planned to be the reference implementation for the TPK data 
   - [ ] Big endianness support
   - [ ] Parser hints (e.g. data size)
 - [ ] Entry-mode reading and writing
-- [ ] CI/CD
+- [x] CI/CD
   - [x] CI
-  - [ ] CD
-- [ ] Publish crate
+  - [x] CD
+- [x] Publish crate
 
 ### 0.1.x - Planned enhancements unrelated to the format
 
