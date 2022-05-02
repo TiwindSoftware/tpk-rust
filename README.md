@@ -36,11 +36,11 @@ For example, to write the TPK equivalent of the following JSON structure:
 you would need to do the following:
 
 ```rust
-use tpk::{Element, TpkWriter};
+use tpk::{Element, Writer};
 
 fn main() {
     // "output" is an already created `Write` implementor
-    let mut writer = TpkWriter::new(output);
+    let mut writer = Writer::new(output);
     writer.write_element(&Element::Marker("format".into()));
     writer.write_element(&Element::String("TPK".into()));
     writer.write_element(&Element::Marker("version".into()));
@@ -59,11 +59,11 @@ fn main() {
 This looks quite verbose. Reading is even worse:
 
 ```rust
-use tpk::{Element, TpkReader};
+use tpk::{Element, Reader};
 
 fn main() {
     // "input" is an already created `Read` implementor
-    let mut reader = TpkReader::new(input);
+    let mut reader = Reader::new(input);
 
     // At the moment end of file = syntax error, so let's treat errors as EOF
     let mut in_version = false;

@@ -1,9 +1,9 @@
 use std::iter::repeat;
-use tpk::{Element, TpkWriter};
+use tpk::{Element, Writer};
 
 fn assert_element_write(element: Element, expected_size: usize) -> Vec<u8> {
     let mut output = vec![];
-    let mut writer = TpkWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_element(&element).unwrap();
     assert_eq!(output.len(), expected_size);
     output
@@ -74,7 +74,7 @@ fn test_write_uint64() {
             0b01011111u8,
             0b11011010u8,
             0b10110100u8,
-            0b00001101u8
+            0b00001101u8,
         ]
     );
 }
@@ -117,7 +117,7 @@ fn test_write_int64() {
             0b10100000u8,
             0b00100101u8,
             0b01001011u8,
-            0b11110010u8
+            0b11110010u8,
         ]
     );
 }
@@ -147,7 +147,7 @@ fn test_write_float64() {
             0b00000100u8,
             0b01001101u8,
             0b00100101u8,
-            0b11000010u8
+            0b11000010u8,
         ]
     );
 }

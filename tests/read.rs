@@ -1,11 +1,11 @@
 use std::io::Cursor;
 use tpk::read::Error;
-use tpk::{Element, TpkReader};
+use tpk::{Element, Reader};
 
 macro_rules! read_element {
     ($i:ident reads to $p:pat => $e:expr) => {
         let cursor = Cursor::new($i);
-        let mut reader = TpkReader::new(cursor);
+        let mut reader = Reader::new(cursor);
         let result = reader.read_element().unwrap();
         match result {
             $p => $e,
@@ -15,7 +15,7 @@ macro_rules! read_element {
     ($i:ident reads to $p:pat) => {read_element!($i reads to $p => ())};
     ($i:ident fails with $p:pat => $e:expr) => {
         let cursor = Cursor::new($i);
-        let mut reader = TpkReader::new(cursor);
+        let mut reader = Reader::new(cursor);
         let result = reader.read_element();
         match result {
             Err(e) => {

@@ -67,7 +67,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// This structure holds the source from which TPK data should be read, as well as internal reader
 /// contextual data.
-pub struct TpkReader<T> {
+pub struct Reader<T> {
     read: T,
     previous_bytes_read: usize,
     bytes_read: usize,
@@ -75,13 +75,12 @@ pub struct TpkReader<T> {
 
 const UNEXPECTED_EOF: &str = "expected more, got EOF";
 
-impl<T> TpkReader<T>
-where
-    T: io::Read,
+impl<T> Reader<T>
+    where T: io::Read,
 {
-    /// Create a new [TPK reader][TpkReader].
-    pub fn new(read: T) -> TpkReader<T> {
-        TpkReader {
+    /// Create a new [TPK reader][Reader].
+    pub fn new(read: T) -> Reader<T> {
+        Reader {
             read,
             previous_bytes_read: 0,
             bytes_read: 0,

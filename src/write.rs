@@ -27,17 +27,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// A TPK writer structure.
 ///
 /// This structure holds the destination to which TPK data should be written.
-pub struct TpkWriter<T> {
+pub struct Writer<T> {
     write: T,
 }
 
-impl<T> TpkWriter<T>
-where
-    T: io::Write,
+impl<T> Writer<T>
+    where T: io::Write,
 {
-    /// Create a new [TPK writer][TpkWriter].
-    pub fn new(write: T) -> TpkWriter<T> {
-        TpkWriter { write }
+    /// Create a new [TPK writer][Writer].
+    pub fn new(write: T) -> Writer<T> {
+        Writer { write }
     }
 
     /// Write the given [Element] to this writer.
