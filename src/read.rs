@@ -76,7 +76,8 @@ pub struct Reader<T> {
 const UNEXPECTED_EOF: &str = "expected more, got EOF";
 
 impl<T> Reader<T>
-    where T: io::Read,
+where
+    T: io::Read,
 {
     /// Create a new [TPK reader][Reader].
     pub fn new(read: T) -> Reader<T> {

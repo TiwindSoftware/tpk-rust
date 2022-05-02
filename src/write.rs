@@ -32,7 +32,8 @@ pub struct Writer<T> {
 }
 
 impl<T> Writer<T>
-    where T: io::Write,
+where
+    T: io::Write,
 {
     /// Create a new [TPK writer][Writer].
     pub fn new(write: T) -> Writer<T> {
