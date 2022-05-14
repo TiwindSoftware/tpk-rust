@@ -1,3 +1,4 @@
+use crate::model::Entry;
 use crate::read::Error::{Syntax, UnknownType};
 use crate::Element;
 use byteorder::{ByteOrder, LE};
@@ -22,6 +23,12 @@ pub enum Error {
         #[from]
         source: io::Error,
     },
+
+    /// The end of file has been reached.
+    ///
+    /// Note that this error can be considered normal behavior,
+    #[error("End of file reached")]
+    Eof,
 
     /// A syntax error happened.
     ///
@@ -71,6 +78,8 @@ pub struct Reader<T> {
     read: T,
     previous_bytes_read: usize,
     bytes_read: usize,
+    current_name: String,
+    retained_element: Option<Element>,
 }
 
 const UNEXPECTED_EOF: &str = "expected more, got EOF";
@@ -85,6 +94,8 @@ where
             read,
             previous_bytes_read: 0,
             bytes_read: 0,
+            current_name: String::from("/"),
+            retained_element: None,
         }
     }
 
@@ -92,14 +103,26 @@ where
     ///
     /// This function will consume bytes from the source reader, and will attempt to parse them
     /// and construct a new [element][Element].
-    pub fn read_element(&mut self) -> Result<Element> {
-        let type_byte = self.expect::<1>()?[0];
+    pub fn read_element(&mut self) -> Result<Option<Element>> {
+        if let Some(retained_element) = self.retained_element.take() {
+            return Ok(Some(retained_element));
+        }
+
+        let mut type_byte_buf = [0u8; 1];
+        let bytes_read = self.read.read(&mut type_byte_buf)?;
+        if bytes_read == 0 {
+            return Ok(None);
+        }
+        self.previous_bytes_read = self.bytes_read;
+        self.bytes_read += bytes_read;
+        let type_byte = type_byte_buf[0];
         if type_byte & 0b10000000 != 0 {
-            return self.read_marker(type_byte);
+            let element = self.read_marker(type_byte)?;
+            return Ok(Some(element));
         }
 
         #[allow(deprecated)]
-        match (type_byte & 0xF0) >> 4 {
+        let element = match (type_byte & 0xF0) >> 4 {
             0b0000 => self.read_folder(type_byte),
             0b0010 => self.read_number(type_byte),
             0b0011 => self.read_boolean(type_byte),
@@ -109,7 +132,47 @@ where
                 "extension",
             )),
             _ => Err(UnknownType(self.previous_bytes_read, type_byte)),
+        }?;
+        Ok(Some(element))
+    }
+
+    /// Read an [entry][Entry] from this reader.
+    ///
+    /// Reading an entry means reading one marker element, followed by a zero, one or more
+    /// non-marker elements, until another marker or the end of file is reached.
+    ///
+    /// Note that due to the fact that this reader exposes
+    /// [lower level functions][Self::read_element], the marker element corresponding to an entry
+    /// may have already been read. As such, this reader remembers the name of the last marker
+    /// element read, and if the entry does not begin with an marker element, the remembered
+    /// marker will be used instead.
+    pub fn read_entry(&mut self) -> Result<Option<Entry>> {
+        let first_element = self.read_element()?;
+        if first_element.is_none() {
+            return Ok(None);
         }
+
+        let mut elements = Vec::with_capacity(1); // Entries usually have one element.
+        let name = if let Some(Element::Marker(name)) = first_element {
+            name
+        } else {
+            elements.push(first_element.unwrap());
+            self.current_name.clone()
+        };
+
+        while let Some(element) = self.read_element()? {
+            match element {
+                Element::Marker(name) => {
+                    self.retained_element = Some(Element::Marker(name));
+                    break;
+                }
+                _ => {
+                    elements.push(element);
+                }
+            }
+        }
+
+        Ok(Some(Entry { name, elements }))
     }
 
     fn read_marker(&mut self, type_byte: u8) -> Result<Element> {
@@ -123,7 +186,10 @@ where
             shift += 7;
         }
 
-        self.read_utf8_string(size).map(Element::Marker)
+        let name = self.read_utf8_string(size)?;
+        self.current_name.clear();
+        self.current_name.push_str(name.as_str());
+        Ok(Element::Marker(name))
     }
 
     fn read_folder(&mut self, type_byte: u8) -> Result<Element> {

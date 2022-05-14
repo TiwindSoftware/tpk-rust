@@ -1,6 +1,6 @@
 use std::io::Cursor;
-use tpk::read::Error;
-use tpk::{Element, Reader};
+use tpk::read::{Error, Result};
+use tpk::{Element, Entry, Reader};
 
 macro_rules! read_element {
     ($i:ident reads to $p:pat => $e:expr) => {
@@ -8,8 +8,9 @@ macro_rules! read_element {
         let mut reader = Reader::new(cursor);
         let result = reader.read_element().unwrap();
         match result {
-            $p => $e,
-            _ => panic!("Expected specific element"),
+            Some($p) => $e,
+            Some(_) => panic!("Expected specific element"),
+            None => panic!("Expected some element"),
         }
     };
     ($i:ident reads to $p:pat) => {read_element!($i reads to $p => ())};
@@ -27,6 +28,12 @@ macro_rules! read_element {
             Ok(_) => panic!("Expected read to fail"),
         }
     };
+}
+
+fn read_entry(input: &[u8]) -> Result<Option<Entry>> {
+    let cursor = Cursor::new(input);
+    let mut reader = Reader::new(cursor);
+    reader.read_entry()
 }
 
 #[test]
@@ -200,4 +207,137 @@ fn test_extension_not_supported() {
         assert_eq!(pos, 0);
         assert_eq!(msg, "extension");
     });
+}
+
+// The following could be used to represent a timestamp while retaining the information about
+// what it represents: a unix timestamp. This shows the rationale behind allowing multiple
+// elements per named entry in TPK payloads.
+const TIMESTAMP_ENTRY: [u8; 21] = [
+    // Marker - "name"
+    0b10000100u8,
+    b'n',
+    b'a',
+    b'm',
+    b'e',
+    // Unsigned integer - 1651906455
+    0b00100010u8,
+    0b10010111u8,
+    0b00010111u8,
+    0b01110110u8,
+    0b01100010u8,
+    // String - "unix_time"
+    0b00010000u8,
+    0b00001001u8,
+    b'u',
+    b'n',
+    b'i',
+    b'x',
+    b'_',
+    b't',
+    b'i',
+    b'm',
+    b'e',
+];
+
+#[test]
+fn test_read_entry() {
+    let mut input = Vec::new();
+    input.extend_from_slice(&TIMESTAMP_ENTRY);
+
+    let result = read_entry(&input).unwrap().unwrap();
+
+    assert_eq!(result.name, "name");
+    assert_eq!(result.elements.len(), 2);
+    assert!(matches!(
+        result.elements.get(0),
+        Some(Element::UInteger32(1651906455))
+    ));
+    assert!(matches!(
+        result.elements.get(1),
+        Some(Element::String(str)) if str == "unix_time"
+    ));
+}
+
+#[test]
+fn test_read_entry_with_error() {
+    let mut input = Vec::new();
+    input.extend_from_slice(&TIMESTAMP_ENTRY);
+    input[10] = 0b01000000u8;
+
+    let result = read_entry(&input);
+
+    assert!(matches!(result, Err(Error::UnknownType(10, 0b01000000u8))));
+}
+
+#[test]
+fn test_read_two_entries() {
+    let mut input = Vec::new();
+    input.extend_from_slice(&TIMESTAMP_ENTRY);
+    input.extend_from_slice(&TIMESTAMP_ENTRY);
+    input[22] = b'l';
+
+    // We cannot use our utility function here as we need to keep the reader's state between reads.
+    let cursor = Cursor::new(input);
+    let mut reader = Reader::new(cursor);
+    let result = reader.read_entry().unwrap().unwrap();
+    let second_result = reader.read_entry().unwrap().unwrap();
+
+    assert_eq!(result.name, "name");
+    assert_eq!(result.elements.len(), 2);
+    assert!(matches!(
+        result.elements.get(0),
+        Some(Element::UInteger32(1651906455))
+    ));
+    assert!(matches!(
+        result.elements.get(1),
+        Some(Element::String(str)) if str == "unix_time"
+    ));
+    assert_eq!(second_result.name, "lame");
+    assert_eq!(second_result.elements.len(), 2);
+    assert!(matches!(
+        second_result.elements.get(0),
+        Some(Element::UInteger32(1651906455))
+    ));
+    assert!(matches!(
+        second_result.elements.get(1),
+        Some(Element::String(str)) if str == "unix_time"
+    ));
+}
+
+#[test]
+fn test_read_implicit_entry() {
+    let mut input = Vec::new();
+    input.extend_from_slice(&TIMESTAMP_ENTRY);
+
+    let result = read_entry(&input[5..]).unwrap().unwrap();
+
+    assert_eq!(result.name, "/");
+    assert_eq!(result.elements.len(), 2);
+    assert!(matches!(
+        result.elements.get(0),
+        Some(Element::UInteger32(1651906455))
+    ));
+    assert!(matches!(
+        result.elements.get(1),
+        Some(Element::String(str)) if str == "unix_time"
+    ));
+}
+
+#[test]
+fn test_read_half_consumed_entry() {
+    let mut input = Vec::new();
+    input.extend_from_slice(&TIMESTAMP_ENTRY);
+
+    let cursor = Cursor::new(input);
+    let mut reader = Reader::new(cursor);
+    reader.read_element().unwrap(); // Read the marker
+    reader.read_element().unwrap(); // Read the integer
+    let result = reader.read_entry().unwrap().unwrap();
+
+    assert_eq!(result.name, "name");
+    assert_eq!(result.elements.len(), 1);
+    assert!(matches!(
+        result.elements.get(0),
+        Some(Element::String(str)) if str == "unix_time"
+    ));
 }

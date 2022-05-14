@@ -38,6 +38,14 @@ pub enum Element {
     Blob(Vec<u8>),
 }
 
+/// Representation of a TPK entry.
+///
+/// A TPK entry is composed of a name and zero, one or more associated elements.
+pub struct Entry {
+    pub name: String,
+    pub elements: Vec<Element>,
+}
+
 impl Element {
     /// Get the type byte for this [Element].
     pub fn get_type_byte(&self) -> u8 {
