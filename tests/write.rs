@@ -1,10 +1,18 @@
 use std::iter::repeat;
-use tpk::{Element, Writer};
+use tpk::{Element, Entry, Writer};
 
 fn assert_element_write(element: Element, expected_size: usize) -> Vec<u8> {
     let mut output = vec![];
     let mut writer = Writer::new(&mut output);
     writer.write_element(&element).unwrap();
+    assert_eq!(output.len(), expected_size);
+    output
+}
+
+fn assert_entry_write(entry: Entry, expected_size: usize) -> Vec<u8> {
+    let mut output = vec![];
+    let mut writer = Writer::new(&mut output);
+    writer.write_entry(&entry).unwrap();
     assert_eq!(output.len(), expected_size);
     output
 }
@@ -195,4 +203,55 @@ fn test_write_medium_blob() {
     assert_eq!(output[0], 0b00010101u8);
     assert_eq!(output[1..3], vec![0b11110100u8, 0b00000001u8]);
     assert_eq!(output[3..], vec![42u8; 500]);
+}
+
+#[test]
+fn test_write_entry() {
+    let entry = Entry {
+        name: String::from("name"),
+        elements: vec![
+            Element::UInteger32(1651906455),
+            Element::String(String::from("unix_time")),
+        ],
+    };
+
+    let output = assert_entry_write(entry, 21);
+    assert_eq!(output[0..5], vec![0b10000100u8, b'n', b'a', b'm', b'e']);
+    assert_eq!(
+        output[5..10],
+        vec![
+            0b00100010u8,
+            0b10010111u8,
+            0b00010111u8,
+            0b01110110u8,
+            0b01100010u8
+        ]
+    );
+    assert_eq!(
+        output[10..],
+        vec![
+            0b00010000u8,
+            0b00001001u8,
+            b'u',
+            b'n',
+            b'i',
+            b'x',
+            b'_',
+            b't',
+            b'i',
+            b'm',
+            b'e'
+        ]
+    )
+}
+
+#[test]
+fn test_write_entry_with_no_elements() {
+    let entry = Entry {
+        name: String::from("name"),
+        elements: Vec::new(),
+    };
+
+    let output = assert_entry_write(entry, 5);
+    assert_eq!(output, vec![0b10000100u8, b'n', b'a', b'm', b'e']);
 }

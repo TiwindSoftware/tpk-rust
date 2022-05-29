@@ -1,4 +1,4 @@
-use crate::Element;
+use crate::{Element, Entry};
 use std::{io, mem};
 use thiserror::Error;
 
@@ -44,6 +44,9 @@ where
     ///
     /// This function will write the binary representation of the TPK element, including the type
     /// byte, size bytes and data bytes (if any).
+    ///
+    /// Note that this is a low-level function and, as such, it makes it possible to write
+    /// semantically invalid TPK data, especially while writing [marker elements][Element::Marker].
     pub fn write_element(&mut self, element: &Element) -> Result<()> {
         self.write.write_all(&[element.get_type_byte()])?;
 
@@ -98,6 +101,23 @@ where
             }
             _ => (),
         };
+        Ok(())
+    }
+
+    /// Write the given [Entry] to this writer.
+    ///
+    /// This function will write the binary representation of this entry, by writing a
+    /// [marker element][Element::Marker] containing the name of the entry, as well as every data
+    /// element that this entry contains.
+    ///
+    /// Note that this is a low-level function, and as such, it is possible to write semantically
+    /// invalid TPK data using this function if the entry contains an invalid name.
+    pub fn write_entry(&mut self, entry: &Entry) -> Result<()> {
+        let marker = Element::Marker(entry.name.clone());
+        self.write_element(&marker)?;
+        for element in &entry.elements {
+            self.write_element(element)?;
+        }
         Ok(())
     }
 }
