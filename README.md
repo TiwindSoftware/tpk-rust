@@ -17,7 +17,9 @@ At the time of writing, the specification is not finalized, nor is this implemen
 
 ## Usage
 
-At the moment, only manual writing/reading of elements is supported. This means that markers, folders and elements all need to be written and read manually.
+At the moment, only manual writing/reading of elements and entries is supported. This means that most data needs to be written and read manually.
+
+### Element-based writing/reading
 
 For example, to write the TPK equivalent of the following JSON structure:
 
@@ -36,11 +38,11 @@ For example, to write the TPK equivalent of the following JSON structure:
 you would need to do the following:
 
 ```rust
-use tpk::{Element, TpkWriter};
+use tpk::{Element, Writer};
 
 fn main() {
     // "output" is an already created `Write` implementor
-    let mut writer = TpkWriter::new(output);
+    let mut writer = Writer::new(output);
     writer.write_element(&Element::Marker("format".into()));
     writer.write_element(&Element::String("TPK".into()));
     writer.write_element(&Element::Marker("version".into()));
@@ -59,61 +61,60 @@ fn main() {
 This looks quite verbose. Reading is even worse:
 
 ```rust
-use tpk::{Element, TpkReader};
+use tpk::{Element, Reader};
+
+#[inline(always)]
+fn print_string(name: &'static str, element: Element) {
+  match element {
+    Element::String(string) => println!("The {} is {}", name, string),
+    _ => panic!("Expected string element, got something else"),
+  };
+}
+
+#[inline(always)]
+fn print_uint8(name: &'static str, element: Element) {
+  match element {
+    Element::UInteger8(number) => println!("The {} is {}", name, number),
+    _ => panic!("Expected unsigned integer element, got something else"),
+  };
+}
 
 fn main() {
     // "input" is an already created `Read` implementor
-    let mut reader = TpkReader::new(input);
+    let mut reader = Reader::new(input);
 
-    // At the moment end of file = syntax error, so let's treat errors as EOF
     let mut in_version = false;
-    while let Ok(element) = reader.read_element() {
+    while let Ok(Some(element)) = reader.read_element() {
         if in_version {
             match element {
                 Element::Marker(name) if name == "name" => {
-                    print_string("version name", reader.read_element().unwrap());
+                    print_string("version name", reader.read_element().unwrap().unwrap());
                 }
                 Element::Marker(name) if name == "major" => {
-                    print_uint8("major version", reader.read_element().unwrap());
+                    print_uint8("major version", reader.read_element().unwrap().unwrap());
                 }
                 Element::Marker(name) if name == "minor" => {
-                    print_uint8("minor version", reader.read_element().unwrap());
+                    print_uint8("minor version", reader.read_element().unwrap().unwrap());
                 }
                 Element::Marker(name) if name == "patch" => {
-                    print_uint8("patch version", reader.read_element().unwrap());
+                    print_uint8("patch version", reader.read_element().unwrap().unwrap());
                 }
                 _ => panic!("Unrecognized entry"),
             }
         } else {
             match element {
                 Element::Marker(name) if name == "format" => {
-                    print_string("format", reader.read_element().unwrap());
+                    print_string("format", reader.read_element().unwrap().unwrap());
                 }
                 Element::Marker(name) if name == "version" => {
                     in_version = true;
                     // Oops, we're not checking that version is a folder!
-                    reader.read_element().unwrap();
+                    reader.read_element().unwrap().unwrap();
                 }
                 _ => panic!("Unrecognized entry"),
             };
         }
     }
-}
-
-#[inline(always)]
-fn print_string(name: &'static str, element: Element) {
-    match element {
-        Element::String(string) => println!("The {} is {}", name, string),
-        _ => panic!("Expected string element, got something else"),
-    };
-}
-
-#[inline(always)]
-fn print_uint8(name: &'static str, element: Element) {
-    match element {
-        Element::UInteger8(number) => println!("The {} is {}", name, number),
-        _ => panic!("Expected unsigned integer element, got something else"),
-    };
 }
 ```
 
@@ -121,7 +122,124 @@ Ouch, that's rough! And we're not even supporting all edge cases... We could eas
 
 This way of writing and reading a file is called "element-mode". This is the lowest-level way of dealing with TPK data and should only be used by tools that need to manipulate raw TPK metadata. This is also the only way supported by `tpk-rust`, for now.
 
-If your need is to casually and easily read and write data to and from TPK files, for example, it is best to wait for the entry-mode, tree-mode or even `serde` support to be implemented.
+If your need is to casually and easily read and write data to and from TPK files, for example, it is best to wait for the tree-mode or even `serde` support to be implemented.
+
+### Entry-based writing/reading
+
+Let's try to write the aforementioned structure as TPK data using entry-based writing:
+
+```rust
+use tpk::{Element, Entry, Writer};
+
+fn main() {
+  // "output" is an already created `Write` implementor
+  let mut writer = Writer::new(file);
+    writer.write_entry(&Entry {
+        name: "format".into(),
+        elements: vec![Element::String("TPK".into())],
+    });
+    writer.write_entry(&Entry {
+        name: "version".into(),
+        elements: vec![Element::Folder],
+    });
+    writer.write_entry(&Entry {
+        name: "name".into(),
+        elements: vec![Element::String("First Development Release".into())],
+    });
+    writer.write_entry(&Entry {
+        name: "major".into(),
+        elements: vec![Element::UInteger8(0)],
+    });
+    writer.write_entry(&Entry {
+        name: "minor".into(),
+        elements: vec![Element::UInteger8(1)],
+    });
+    writer.write_entry(&Entry {
+        name: "patch".into(),
+        elements: vec![Element::UInteger8(0)],
+    });
+}
+```
+
+It's slightly less verbose, but more importantly it is more structure, which allows us to factorize the code a little bit:
+
+```rust
+use tpk::{Element, Entry, Writer};
+
+#[inline(always)]
+fn create_entry(name: &str, element: Element) -> Entry {
+    Entry {
+        name: name.into(),
+        elements: vec![element],
+    }
+}
+
+fn main() {
+    // "output" is an already created `Write` implementor
+    let mut writer = Writer::new(output);
+    writer.write_entry(&create_entry("format", Element::String("TPK".into())));
+    writer.write_entry(&create_entry("version", Element::Folder));
+    writer.write_entry(&create_entry(
+        "name",
+        Element::String("First Development Release".into()),
+    ));
+    writer.write_entry(&create_entry("major", Element::UInteger8(0)));
+    writer.write_entry(&create_entry("minor", Element::UInteger8(1)));
+    writer.write_entry(&create_entry("patch", Element::UInteger8(0)));
+}
+```
+
+Much better! As it shows, entry-based writing mode is particularly useful when we want to operate in a low-level mode, but we don't want to deal with the marker/element association ourselves and the small overhead is acceptable.
+
+Reading using entry-based mode is a little easier as well:
+
+```rust
+use tpk::{Element, Reader};
+
+#[inline(always)]
+fn print_string(name: &'static str, element: &Element) {
+  match element {
+    Element::String(string) => println!("The {} is {}", name, string),
+    _ => panic!("Expected string element, got something else"),
+  };
+}
+
+#[inline(always)]
+fn print_uint8(name: &'static str, element: &Element) {
+  match element {
+    Element::UInteger8(number) => println!("The {} is {}", name, number),
+    _ => panic!("Expected unsigned integer element, got something else"),
+  };
+}
+
+fn main() {
+  // "input" is an already created `Read` implementor
+  let mut reader = Reader::new(input);
+
+    let mut in_version = false;
+    while let Ok(Some(element)) = reader.read_entry() {
+        if in_version {
+            match element.name.as_str() {
+                "name" => print_string("version name", &element.elements[0]),
+                "major" => print_uint8("major version", &element.elements[0]),
+                "minor" => print_uint8("minor version", &element.elements[0]),
+                "patch" => print_uint8("patch version", &element.elements[0]),
+                _ => panic!("Unrecognized entry"),
+            }
+        } else {
+            match element.name.as_str() {
+                "format" => print_string("format", &element.elements[0]),
+                "version" => {
+                    in_version = true;
+                }
+                _ => panic!("Unrecognized entry"),
+            }
+        }
+    }
+}
+```
+
+Unfortunately, this implementation is just less verbose: we're still not handling some edge cases like `..` or `/*` folders, and we still do not type-check the `version` folder entry.
 
 ## Roadmap
 
@@ -143,7 +261,7 @@ Since `tpk-rust` is planned to be the reference implementation for the TPK data 
   - [ ] Dependency management
   - [ ] Big endianness support
   - [ ] Parser hints (e.g. data size)
-- [ ] Entry-mode reading and writing
+- [x] Entry-mode reading and writing
 - [x] CI/CD
   - [x] CI
   - [x] CD
