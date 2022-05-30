@@ -194,6 +194,8 @@ Much better! As it shows, entry-based writing mode is particularly useful when w
 Reading using entry-based mode is a little easier as well:
 
 ```rust
+use tpk::{Element, Reader};
+
 #[inline(always)]
 fn print_string(name: &'static str, element: &Element) {
   match element {
